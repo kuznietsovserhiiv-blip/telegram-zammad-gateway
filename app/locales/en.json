@@ -1,0 +1,11 @@
+{
+  "start": "Start", "help": "Show available commands",
+  "new": "Create a new ticket", "mytickets": "My open tickets",
+  "current": "Show current ticket", "close": "Close current conversation",
+  "my": "My active tickets", "newtickets": "All new tickets", "ticket": "Select a ticket by number",
+  "button_new": "📝 New ticket", "button_mytickets": "📋 My open tickets",
+  "button_current": "📌 Current ticket", "button_close": "✅ Close conversation",
+  "button_help": "ℹ️ Help", "button_my": "📋 My tickets",
+  "button_newtickets": "🆕 New tickets", "button_ticket": "🔎 Select a ticket",
+  "new_placeholder": "Describe the issue", "ticket_placeholder": "Enter ticket number"
+}

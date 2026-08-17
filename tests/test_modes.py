@@ -85,13 +85,23 @@ def test_role_specific_bot_commands() -> None:
 
 def test_russian_language_menu_and_keyboard() -> None:
     assert locale_from_telegram("ru-RU") == "ru"
-    assert locale_from_telegram("en") == "uk"
+    assert locale_from_telegram("en-US") == "en"
+    assert locale_from_telegram("de-DE") == "uk"
     assert commands_for_mode("customer", "ru")[0] == {
         "command": "new",
         "description": "Создать новую заявку",
     }
     keyboard = keyboard_for_mode("admin", "ru")
     assert keyboard["keyboard"][0][0]["text"] == "📋 Мои заявки"
+
+
+def test_english_language_menu_and_keyboard() -> None:
+    assert commands_for_mode("customer", "en")[0] == {
+        "command": "new",
+        "description": "Create a new ticket",
+    }
+    keyboard = keyboard_for_mode("customer", "en")
+    assert keyboard["keyboard"][0][0]["text"] == "📝 New ticket"
 
 
 def test_ticket_list_format() -> None:

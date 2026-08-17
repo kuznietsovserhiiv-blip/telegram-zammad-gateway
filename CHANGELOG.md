@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-17
+
+### Added
+
+- English Telegram command menus and reply keyboards.
+- JSON translation catalogs in `app/locales/` for Ukrainian, English, and Russian.
+
 ## [0.2.0] - 2026-08-17
 
 ### Added
