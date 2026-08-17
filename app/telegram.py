@@ -174,6 +174,12 @@ def ticket_inline_keyboard(tickets: list[dict]) -> dict:
 
 def help_text(mode: str, locale: str = "uk") -> str:
     if mode == "customer":
+        if locale == "en":
+            return (
+                "Commands:\n/new <issue description> — create a ticket\n"
+                "/mytickets — my open tickets\n/current — current ticket\n"
+                "/close — close the current conversation"
+            )
         if locale == "ru":
             return (
                 "Команды:\n/new <описание проблемы> — создать заявку\n"
@@ -188,6 +194,12 @@ def help_text(mode: str, locale: str = "uk") -> str:
             "/close — завершити поточний діалог"
         )
     if mode == "admin":
+        if locale == "en":
+            return (
+                "Commands:\n/my — my active tickets\n/newtickets — all new tickets\n"
+                "/ticket <number> — select a ticket\n/current — current ticket\n"
+                "/close — close the current conversation"
+            )
         if locale == "ru":
             return (
                 "Команды:\n/my — мои активные заявки\n/newtickets — все новые заявки\n"
@@ -202,6 +214,8 @@ def help_text(mode: str, locale: str = "uk") -> str:
             "/current — поточна заявка\n"
             "/close — завершити поточний діалог"
         )
+    if locale == "en":
+        return "Your Telegram access mode is not supported yet."
     return "Ваш режим работы с Telegram пока не поддерживается." if locale == "ru" else "Ваш режим роботи з Telegram поки не реалізований."
 
 
