@@ -8,6 +8,7 @@ from app.telegram import (
     customer_can_access_ticket,
     zammad_search_value,
 )
+from app.i18n import locale_from_telegram
 from app.telegram_client import commands_for_mode, keyboard_for_mode
 
 
@@ -49,6 +50,8 @@ def test_command_parsing() -> None:
     assert command_name("📝 Нова заявка") == ("/new", "")
     assert command_name("📋 Мої незакриті заявки") == ("/mytickets", "")
     assert command_name("📋 Мої заявки") == ("/my", "")
+    assert command_name("📝 Новая заявка") == ("/new", "")
+    assert command_name("📋 Мои заявки") == ("/my", "")
 
 
 def test_ticket_title_uses_first_nonempty_line() -> None:
@@ -78,6 +81,17 @@ def test_role_specific_bot_commands() -> None:
     assert keyboard_for_mode("customer")["is_persistent"] is True
     assert keyboard_for_mode("admin")["is_persistent"] is True
     assert keyboard_for_mode("denied") is None
+
+
+def test_russian_language_menu_and_keyboard() -> None:
+    assert locale_from_telegram("ru-RU") == "ru"
+    assert locale_from_telegram("en") == "uk"
+    assert commands_for_mode("customer", "ru")[0] == {
+        "command": "new",
+        "description": "Создать новую заявку",
+    }
+    keyboard = keyboard_for_mode("admin", "ru")
+    assert keyboard["keyboard"][0][0]["text"] == "📋 Мои заявки"
 
 
 def test_ticket_list_format() -> None:

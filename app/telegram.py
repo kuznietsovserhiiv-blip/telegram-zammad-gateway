@@ -25,13 +25,14 @@ from app.session_service import (
 )
 from app.models import TelegramUpdate
 from app.telegram_client import (
-    NEW_TICKET_FORCE_REPLY,
-    TICKET_NUMBER_FORCE_REPLY,
     keyboard_for_mode,
+    new_ticket_force_reply,
     safe_answer_callback_query,
     safe_send_message,
     safe_set_chat_commands,
+    ticket_number_force_reply,
 )
+from app.i18n import SUPPORTED_LOCALES, locale_from_telegram, text as tr
 from app.zammad import ZammadApi, ZammadApiError
 
 
@@ -39,14 +40,14 @@ logger = logging.getLogger("telegram_gateway.telegram")
 router = APIRouter(prefix="/telegram", tags=["telegram"])
 
 BUTTON_COMMANDS = {
-    "📝 Нова заявка": "/new",
-    "📋 Мої незакриті заявки": "/mytickets",
-    "📌 Поточна заявка": "/current",
-    "✅ Завершити діалог": "/close",
-    "ℹ️ Допомога": "/help",
-    "📋 Мої заявки": "/my",
-    "🆕 Нові заявки": "/newtickets",
-    "🔎 Вибрати заявку": "/ticket",
+    tr(locale, key): command
+    for locale in SUPPORTED_LOCALES
+    for key, command in {
+        "button_new": "/new", "button_mytickets": "/mytickets",
+        "button_current": "/current", "button_close": "/close",
+        "button_help": "/help", "button_my": "/my",
+        "button_newtickets": "/newtickets", "button_ticket": "/ticket",
+    }.items()
 }
 
 
@@ -171,8 +172,14 @@ def ticket_inline_keyboard(tickets: list[dict]) -> dict:
     return {"inline_keyboard": rows}
 
 
-def help_text(mode: str) -> str:
+def help_text(mode: str, locale: str = "uk") -> str:
     if mode == "customer":
+        if locale == "ru":
+            return (
+                "Команды:\n/new <описание проблемы> — создать заявку\n"
+                "/mytickets — мои незакрытые заявки\n/current — текущая заявка\n"
+                "/close — завершить текущий диалог"
+            )
         return (
             "Команди:\n"
             "/new <опис проблеми> — створити заявку\n"
@@ -181,6 +188,12 @@ def help_text(mode: str) -> str:
             "/close — завершити поточний діалог"
         )
     if mode == "admin":
+        if locale == "ru":
+            return (
+                "Команды:\n/my — мои активные заявки\n/newtickets — все новые заявки\n"
+                "/ticket <номер> — выбрать заявку\n/current — текущая заявка\n"
+                "/close — завершить текущий диалог"
+            )
         return (
             "Команди:\n"
             "/my — мої активні заявки\n"
@@ -189,7 +202,7 @@ def help_text(mode: str) -> str:
             "/current — поточна заявка\n"
             "/close — завершити поточний діалог"
         )
-    return "Ваш режим роботи з Telegram поки не реалізований."
+    return "Ваш режим работы с Telegram пока не поддерживается." if locale == "ru" else "Ваш режим роботи з Telegram поки не реалізований."
 
 
 @router.post("/webhook")
@@ -241,6 +254,7 @@ async def telegram_webhook(
         telegram_chat_id = int(chat["id"])
     except (KeyError, TypeError, ValueError):
         return {"ok": True}
+    locale = locale_from_telegram(sender.get("language_code"))
 
     if callback_query_id:
         await safe_answer_callback_query(settings, callback_query_id)
@@ -283,7 +297,7 @@ async def telegram_webhook(
             settings,
             telegram_chat_id,
             f"Telegram успішно підключено до Zammad: {token_row.zammad_login}",
-            reply_markup=keyboard_for_mode(linked_mode or "denied"),
+            reply_markup=keyboard_for_mode(linked_mode or "denied", locale),
         )
         return {"ok": True}
 
@@ -307,7 +321,7 @@ async def telegram_webhook(
     mode = user_mode(zammad_user, settings)
     if mode in {"agent_disabled", "denied"}:
         await safe_set_chat_commands(settings, telegram_chat_id, mode)
-        await safe_send_message(settings, telegram_chat_id, help_text(mode))
+        await safe_send_message(settings, telegram_chat_id, help_text(mode, locale))
         return {"ok": True}
 
     if callback_data is not None:
@@ -351,8 +365,8 @@ async def telegram_webhook(
         await safe_send_message(
             settings,
             telegram_chat_id,
-            help_text(mode),
-            reply_markup=keyboard_for_mode(mode),
+            help_text(mode, locale),
+            reply_markup=keyboard_for_mode(mode, locale),
         )
         return {"ok": True}
 
@@ -360,7 +374,7 @@ async def telegram_webhook(
         clear_pending_action(db, telegram_user_id)
         session = get_chat_session(db, telegram_user_id)
         if session is None:
-            await safe_send_message(settings, telegram_chat_id, "Поточну заявку не вибрано.\n" + help_text(mode))
+            await safe_send_message(settings, telegram_chat_id, "Поточну заявку не вибрано.\n" + help_text(mode, locale))
         else:
             await safe_send_message(
                 settings,
@@ -416,7 +430,7 @@ async def telegram_webhook(
                     settings,
                     telegram_chat_id,
                     "Опишіть проблему одним повідомленням. Воно стане описом нової заявки.",
-                    reply_markup=NEW_TICKET_FORCE_REPLY,
+                    reply_markup=new_ticket_force_reply(locale),
                 )
                 return {"ok": True}
             organization_id = zammad_user.get("organization_id")
@@ -467,11 +481,11 @@ async def telegram_webhook(
             await safe_send_message(settings, telegram_chat_id, f"Заявку #{ticket['number']} створено: {ticket['title']}")
             return {"ok": True}
         if command.startswith("/"):
-            await safe_send_message(settings, telegram_chat_id, help_text(mode))
+            await safe_send_message(settings, telegram_chat_id, help_text(mode, locale))
             return {"ok": True}
         session = get_chat_session(db, telegram_user_id)
         if session is None or session.mode != "customer":
-            await safe_send_message(settings, telegram_chat_id, "Спочатку створіть заявку.\n" + help_text(mode))
+            await safe_send_message(settings, telegram_chat_id, "Спочатку створіть заявку.\n" + help_text(mode, locale))
             return {"ok": True}
         try:
             ticket = await api.get_ticket(session.zammad_ticket_id)
@@ -557,7 +571,7 @@ async def telegram_webhook(
                     settings,
                     telegram_chat_id,
                     "Введіть номер заявки, яку потрібно вибрати.",
-                    reply_markup=TICKET_NUMBER_FORCE_REPLY,
+                    reply_markup=ticket_number_force_reply(locale),
                 )
                 return {"ok": True}
             if not ticket_number.replace("-", "").isalnum():
@@ -584,11 +598,11 @@ async def telegram_webhook(
             await safe_send_message(settings, telegram_chat_id, f"Вибрано заявку #{ticket['number']}: {ticket['title']}")
             return {"ok": True}
         if command.startswith("/"):
-            await safe_send_message(settings, telegram_chat_id, help_text(mode))
+            await safe_send_message(settings, telegram_chat_id, help_text(mode, locale))
             return {"ok": True}
         session = get_chat_session(db, telegram_user_id)
         if session is None or session.mode != "admin":
-            await safe_send_message(settings, telegram_chat_id, "Спочатку виберіть заявку.\n" + help_text(mode))
+            await safe_send_message(settings, telegram_chat_id, "Спочатку виберіть заявку.\n" + help_text(mode, locale))
             return {"ok": True}
         try:
             await api.add_article(

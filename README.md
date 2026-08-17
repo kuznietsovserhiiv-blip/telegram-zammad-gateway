@@ -42,6 +42,12 @@ See [deployment.md](docs/deployment.md) for the complete setup, webhook configur
 
 Customer messages are added to the active ticket. Admin messages are added as public Agent articles.
 
+## Languages
+
+The interactive bot menu supports Ukrainian and Russian. The Gateway chooses the menu language from Telegram's `language_code` in each incoming update; Ukrainian is the fallback. No database migration or per-user language setting is required.
+
+Background notifications initiated by Zammad use the Gateway's default text because Telegram does not include the recipient's UI language in those webhook events.
+
 ## Development
 
 ```bash
