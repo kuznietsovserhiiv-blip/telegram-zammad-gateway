@@ -1,0 +1,40 @@
+image: python:3.13-slim
+
+stages:
+  - lint
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+cache:
+  key:
+    files:
+      - requirements.txt
+      - requirements-dev.txt
+  paths:
+    - .cache/pip
+
+lint:
+  stage: lint
+  before_script:
+    - python -m pip install --requirement requirements-dev.txt
+  script:
+    - ruff check app tests zammad_integration
+    - python -m compileall -q app tests zammad_integration
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+
+test:
+  stage: test
+  before_script:
+    - python --version
+    - python -m pip install --requirement requirements-dev.txt
+  script:
+    - python -m pytest -q
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'

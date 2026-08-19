@@ -85,7 +85,7 @@ Place the rule above the general Zammad rule and restrict the Gateway port to th
 
 ## Zammad Linked Accounts integration
 
-For the legacy Zammad frontend, the installer can add Telegram to `Profile → Linked Accounts`:
+For the legacy Zammad frontend, the installer adds Telegram only to `Profile → Linked Accounts`; it is not shown on the sign-in page:
 
 ```bash
 sudo python3 zammad_integration/linked_accounts.py install

@@ -6,6 +6,7 @@ from app.telegram import (
     ticket_title,
     user_mode,
     customer_can_access_ticket,
+    customer_open_tickets,
     zammad_search_value,
 )
 from app.i18n import locale_from_telegram
@@ -43,6 +44,18 @@ def test_customer_ticket_access_requires_owner_and_open_state() -> None:
     )
     assert not customer_can_access_ticket({"customer_id": 43, "state": "open"}, 42)
     assert not customer_can_access_ticket({"customer_id": 42, "state": {"name": "closed"}}, 42)
+
+
+def test_customer_open_tickets_includes_new_tickets() -> None:
+    tickets = customer_open_tickets(
+        [
+            {"id": 1, "customer_id": 42, "state": "new"},
+            {"id": 2, "customer_id": 42, "state": "closed"},
+            {"id": 3, "customer_id": 43, "state": "open"},
+        ],
+        42,
+    )
+    assert tickets == [{"id": 1, "customer_id": 42, "state": "new"}]
 
 
 def test_command_parsing() -> None:
