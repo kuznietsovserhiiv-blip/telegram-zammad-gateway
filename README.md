@@ -62,7 +62,7 @@ pytest -q
 
 Distributed under the [MIT License](LICENSE).
 
-Telegram Zammad Gateway is an independent integration that communicates with Zammad through its HTTP API and webhooks. It does not include or redistribute Zammad source code. Zammad itself is licensed under AGPL-3.0; see the [Zammad repository](https://github.com/zammad/zammad).
+Telegram Zammad Gateway is an independent integration that communicates with Zammad through its HTTP API and webhooks. It does not include or redistribute Zammad source code. The optional Linked Accounts installer adds Telegram only under `Profile → Linked Accounts`, not on the Zammad sign-in page. Zammad itself is licensed under AGPL-3.0; see the [Zammad repository](https://github.com/zammad/zammad).
 
 ## Releases
 

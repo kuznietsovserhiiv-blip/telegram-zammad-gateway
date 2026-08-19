@@ -83,6 +83,18 @@ IIS ARR is only needed when the Gateway must be exposed under the Zammad origin.
 
 Place the rule above the general Zammad rule and restrict the Gateway port to the reverse proxy where possible.
 
+## Zammad Linked Accounts integration
+
+For the legacy Zammad frontend, the installer adds Telegram only to `Profile → Linked Accounts`; it is not shown on the sign-in page:
+
+```bash
+sudo python3 zammad_integration/linked_accounts.py install
+sudo python3 zammad_integration/linked_accounts.py verify
+sudo python3 zammad_integration/linked_accounts.py restore
+```
+
+After a Zammad frontend bundle update, run the installer again if necessary. It creates a backup before modifying a bundle.
+
 ## Retention and security
 
 Pending actions expire after 15 minutes. Processed Telegram updates and completed Zammad deliveries are retained for 30 days by default; configure this with `EVENT_RETENTION_DAYS`.
