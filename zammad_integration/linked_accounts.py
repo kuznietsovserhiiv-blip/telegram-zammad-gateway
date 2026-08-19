@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -22,8 +23,13 @@ LEGACY_TELEGRAM_PROVIDER = (
     'config:"auth_telegram",class:"telegram"}'
 )
 MARKER = 'telegram:{url:"/telegram-gateway/link"'
-LOGIN_PUSH = "auth_providers.push(provider)"
-LOGIN_PUSH_PATCHED = "provider.login!==!1&&auth_providers.push(provider)"
+LOGIN_FILTER = "login!==!1"
+LOGIN_LOOP = re.compile(
+    r'(?P<all>[A-Za-z_$][\w$]*)=App\.Config\.get\("auth_provider_all"\),'
+    r'(?P<providers>[A-Za-z_$][\w$]*)=\[\];for\((?P<key>[A-Za-z_$][\w$]*) in '
+    r'(?P=all)\)(?P<provider>[A-Za-z_$][\w$]*)=(?P=all)\[(?P=key)\],'
+    r'(?P<prefix>\([^;]*?\)&&)(?P=providers)\.push\((?P=provider)\)'
+)
 BACKUP_DIR = Path(__file__).resolve().parent / "backups"
 MANIFEST_PATH = BACKUP_DIR / "manifest.json"
 
@@ -64,10 +70,17 @@ def patch_bundle_text(source: str) -> str:
     elif source.count(TELEGRAM_PROVIDER) != 1:
         raise IntegrationError("Telegram provider has an unexpected format")
 
-    if LOGIN_PUSH_PATCHED not in source:
-        if source.count(LOGIN_PUSH) != 1:
+    if LOGIN_FILTER not in source:
+        if len(LOGIN_LOOP.findall(source)) != 1:
             raise IntegrationError("Expected one login provider insertion point")
-        source = source.replace(LOGIN_PUSH, LOGIN_PUSH_PATCHED, 1)
+        source = LOGIN_LOOP.sub(
+            lambda match: (
+                f"{match.group('prefix')}{match.group('provider')}.{LOGIN_FILTER}"
+                f"&&{match.group('providers')}.push({match.group('provider')})"
+            ),
+            source,
+            count=1,
+        )
     return source
 
 
@@ -140,7 +153,7 @@ def verify() -> None:
     for container in (rails, nginx):
         bundle = find_bundle(container)
         source = run(["docker", "exec", container, "cat", bundle], capture=True)
-        if source.count(TELEGRAM_PROVIDER) != 1 or source.count(LOGIN_PUSH_PATCHED) != 1:
+        if source.count(TELEGRAM_PROVIDER) != 1 or source.count(LOGIN_FILTER) != 1:
             raise IntegrationError(f"Linked Accounts-only patch is missing in {container}")
         print(f"bundle: OK ({container})")
 

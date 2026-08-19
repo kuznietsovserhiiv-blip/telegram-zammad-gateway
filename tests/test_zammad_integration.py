@@ -2,8 +2,7 @@ import pytest
 
 from zammad_integration.linked_accounts import (
     LEGACY_TELEGRAM_PROVIDER,
-    LOGIN_PUSH,
-    LOGIN_PUSH_PATCHED,
+    LOGIN_FILTER,
     PROVIDER_ANCHOR,
     TELEGRAM_PROVIDER,
     IntegrationError,
@@ -12,14 +11,26 @@ from zammad_integration.linked_accounts import (
 
 
 def test_patch_keeps_telegram_only_in_linked_accounts() -> None:
-    patched = patch_bundle_text(f"{PROVIDER_ANCHOR};{LOGIN_PUSH}")
+    source = (
+        f'{PROVIDER_ANCHOR};'
+        'a=App.Config.get("auth_provider_all"),n=[];for(o in a)'
+        'i=a[o],(!0===this.Config.get(i.config)||"true"===this.Config.get(i.config))'
+        '&&n.push(i)'
+    )
+    patched = patch_bundle_text(source)
     assert TELEGRAM_PROVIDER in patched
-    assert LOGIN_PUSH_PATCHED in patched
+    assert f"i.{LOGIN_FILTER}&&n.push(i)" in patched
     assert patch_bundle_text(patched) == patched
 
 
 def test_patch_upgrades_legacy_login_provider() -> None:
-    patched = patch_bundle_text(f"{LEGACY_TELEGRAM_PROVIDER};{LOGIN_PUSH}")
+    source = (
+        f'{LEGACY_TELEGRAM_PROVIDER};'
+        'a=App.Config.get("auth_provider_all"),n=[];for(o in a)'
+        'i=a[o],(!0===this.Config.get(i.config)||"true"===this.Config.get(i.config))'
+        '&&n.push(i)'
+    )
+    patched = patch_bundle_text(source)
     assert TELEGRAM_PROVIDER in patched
     assert LEGACY_TELEGRAM_PROVIDER not in patched
 
