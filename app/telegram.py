@@ -101,6 +101,14 @@ def customer_can_access_ticket(ticket: dict, zammad_user_id: int) -> bool:
     return ticket_customer_id == zammad_user_id and str(state or "").strip().lower() not in closed_states
 
 
+def customer_open_tickets(tickets: list[dict], zammad_user_id: int) -> list[dict]:
+    return [
+        ticket
+        for ticket in tickets
+        if customer_can_access_ticket(ticket, zammad_user_id)
+    ][:20]
+
+
 def command_name(text: str) -> tuple[str, str]:
     button_command = BUTTON_COMMANDS.get(text.strip())
     if button_command:
@@ -407,13 +415,11 @@ async def telegram_webhook(
     if mode == "customer":
         if command == "/mytickets":
             clear_pending_action(db, telegram_user_id)
-            customer_email = str(zammad_user.get("email") or zammad_user.get("login") or "")
-            query = (
-                f'customer.email:"{zammad_search_value(customer_email)}" '
-                "AND state.name:(new OR open OR pending*)"
-            )
             try:
-                tickets = await api.search_tickets(query, per_page=20)
+                tickets = await api.search_tickets(
+                    f"customer_id:{link.zammad_user_id}", per_page=100
+                )
+                tickets = customer_open_tickets(tickets, link.zammad_user_id)
             except ZammadApiError:
                 logger.exception("Unable to list customer tickets for Zammad user id=%s", link.zammad_user_id)
                 await safe_send_message(settings, telegram_chat_id, "Не вдалося отримати ваші заявки із Zammad.")
