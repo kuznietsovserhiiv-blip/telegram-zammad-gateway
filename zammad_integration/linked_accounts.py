@@ -25,10 +25,10 @@ LEGACY_TELEGRAM_PROVIDER = (
 MARKER = 'telegram:{url:"/telegram-gateway/link"'
 LOGIN_FILTER = "login!==!1"
 LOGIN_LOOP = re.compile(
-    r'(?P<all>[A-Za-z_$][\w$]*)=App\.Config\.get\("auth_provider_all"\),'
-    r'(?P<providers>[A-Za-z_$][\w$]*)=\[\];for\((?P<key>[A-Za-z_$][\w$]*) in '
-    r'(?P=all)\)(?P<provider>[A-Za-z_$][\w$]*)=(?P=all)\[(?P=key)\],'
-    r'(?P<prefix>\([^;]*?\)&&)(?P=providers)\.push\((?P=provider)\)'
+    r'(?P<prefix>(?P<providers>[A-Za-z_$][\w$]*)=\[\],'
+    r'(?P<all>[A-Za-z_$][\w$]*)=App\.Config\.get\("auth_provider_all"\)\)'
+    r'(?P<provider>[A-Za-z_$][\w$]*)=(?P=all)\[(?P<key>[A-Za-z_$][\w$]*)\],'
+    r'[^;]*?\|\|)(?P=providers)\.push\((?P=provider)\)'
 )
 BACKUP_DIR = Path(__file__).resolve().parent / "backups"
 MANIFEST_PATH = BACKUP_DIR / "manifest.json"
