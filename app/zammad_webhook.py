@@ -287,9 +287,6 @@ async def zammad_webhook(
         if article.get("internal") is not False:
             if not sent_kinds:
                 outcome = "ignored_internal"
-        elif settings.zammad_service_user_id and created_by_id == settings.zammad_service_user_id:
-            if not sent_kinds:
-                outcome = "ignored_gateway_echo"
         elif article_sender(article) == "customer":
             if owner_link is None:
                 if not sent_kinds:
@@ -298,9 +295,13 @@ async def zammad_webhook(
                 body_text = html_to_text(str(article.get("body") or ""))
                 if not body_text:
                     body_text = "Нове повідомлення без тексту."
+                customer_name = str(article.get("origin_by") or "").strip() or sender_name(article)
                 owner_message = (
-                    f"Заявка #{number}: новий коментар від {sender_name(article)}\n\n{body_text}"
+                    f"Заявка #{number}: новий коментар від {customer_name}\n\n{body_text}"
                 )
+        elif settings.zammad_service_user_id and created_by_id == settings.zammad_service_user_id:
+            if not sent_kinds:
+                outcome = "ignored_gateway_echo"
         elif article_sender(article) != "agent":
             if not sent_kinds:
                 outcome = "ignored_non_agent"

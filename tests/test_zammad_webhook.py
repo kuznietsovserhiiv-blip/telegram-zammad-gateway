@@ -195,8 +195,9 @@ def test_public_customer_article_is_sent_to_linked_ticket_owner(monkeypatch) -> 
             "body": "Need <b>help</b>",
             "internal": False,
             "sender": "Customer",
-            "created_by_id": 42,
-            "created_by": {"id": 42, "firstname": "Iryna", "lastname": "Customer"},
+            "created_by_id": 260,
+            "created_by": {"id": 260, "firstname": "Telegram", "lastname": "Gateway"},
+            "origin_by": "Iryna Customer",
         },
     }
     body = json.dumps(payload, separators=(",", ":")).encode()
