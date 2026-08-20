@@ -70,7 +70,7 @@ Create an active webhook in Zammad:
 - Signature Token: the value of `ZAMMAD_WEBHOOK_SECRET`;
 - Payload: standard.
 
-Trigger the webhook from Zammad. The Gateway forwards public Agent articles and actual ticket state changes to the linked Customer. Public Customer articles are forwarded to the linked owner of the ticket. Internal notes and Agent articles created by the service user are ignored.
+Trigger the webhook from Zammad. The Gateway forwards public Agent articles and actual ticket state changes to the linked Customer. Public Customer articles are forwarded to the linked owner of the ticket. Internal notes are ignored.
 
 ## Optional IIS ARR setup
 

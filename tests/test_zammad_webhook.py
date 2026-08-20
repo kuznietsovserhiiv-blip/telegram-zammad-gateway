@@ -133,8 +133,9 @@ def test_public_agent_article_is_sent_once(monkeypatch) -> None:
             "body": "Public <b>reply</b>",
             "internal": False,
             "sender": "Agent",
-            "created_by_id": 5,
-            "created_by": {"id": 5, "firstname": "Serhii", "lastname": "Kuznetsov"},
+            "created_by_id": 260,
+            "created_by": {"id": 260, "firstname": "Telegram", "lastname": "Gateway"},
+            "origin_by": "Serhii Kuznetsov",
         },
     }
     body = json.dumps(payload, separators=(",", ":")).encode()
