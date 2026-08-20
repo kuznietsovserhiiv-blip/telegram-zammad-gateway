@@ -568,7 +568,7 @@ async def telegram_webhook(
             await api.add_article(
                 ticket_id=session.zammad_ticket_id,
                 user_id=link.zammad_user_id,
-                body=text,
+                body=text.strip() or "Вкладення з Telegram",
                 sender="Customer",
                 article_type="web",
                 attachments=[attachment] if attachment else None,
@@ -677,7 +677,7 @@ async def telegram_webhook(
             await api.add_article(
                 ticket_id=session.zammad_ticket_id,
                 user_id=link.zammad_user_id,
-                body=text,
+                body=text.strip() or "Вкладення з Telegram",
                 sender="Agent",
                 article_type="note",
                 attachments=[attachment] if attachment else None,
