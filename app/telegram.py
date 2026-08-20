@@ -277,7 +277,7 @@ async def telegram_webhook(
         or not isinstance(sender, dict)
         or sender.get("is_bot")
         or not isinstance(text, str)
-        or (not text and not isinstance(media, dict))
+        or (callback_data is None and not text and not isinstance(media, dict))
         or (callback_query_id is not None and not isinstance(callback_data, str))
     ):
         return {"ok": True}
