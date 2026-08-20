@@ -2,6 +2,7 @@ import logging
 import secrets
 import time
 
+import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -31,6 +32,7 @@ from app.telegram_client import (
     safe_send_message,
     safe_set_chat_commands,
     ticket_number_force_reply,
+    download_file,
 )
 from app.i18n import SUPPORTED_LOCALES, locale_from_telegram, text as tr
 from app.zammad import ZammadApi, ZammadApiError
@@ -258,15 +260,24 @@ async def telegram_webhook(
     else:
         message = update.get("message")
         sender = message.get("from") if isinstance(message, dict) else {}
-        text = message.get("text") if isinstance(message, dict) else None
+        text = (message.get("text") or message.get("caption") or "") if isinstance(message, dict) else None
     if not isinstance(message, dict):
         return {"ok": True}
     chat = message.get("chat") or {}
+    media = message.get("document") or message.get("video") or message.get("audio") or message.get("voice")
+    photo = message.get("photo")
+    if isinstance(photo, list) and photo:
+        media = max(
+            (item for item in photo if isinstance(item, dict)),
+            key=lambda item: int(item.get("file_size") or 0),
+            default=None,
+        )
     if (
         chat.get("type") != "private"
         or not isinstance(sender, dict)
         or sender.get("is_bot")
         or not isinstance(text, str)
+        or (not text and not isinstance(media, dict))
         or (callback_query_id is not None and not isinstance(callback_data, str))
     ):
         return {"ok": True}
@@ -345,6 +356,37 @@ async def telegram_webhook(
         await safe_set_chat_commands(settings, telegram_chat_id, mode)
         await safe_send_message(settings, telegram_chat_id, help_text(mode, locale))
         return {"ok": True}
+
+    attachment: tuple[str, str, bytes] | None = None
+    if isinstance(media, dict):
+        file_id = media.get("file_id")
+        if not isinstance(file_id, str) or not file_id:
+            await safe_send_message(settings, telegram_chat_id, "Не вдалося визначити файл Telegram.")
+            return {"ok": True}
+        if "voice" in message:
+            default_filename, default_mime = "telegram-voice.ogg", "audio/ogg"
+        elif "audio" in message:
+            default_filename, default_mime = "telegram-audio.mp3", "audio/mpeg"
+        elif "video" in message:
+            default_filename, default_mime = "telegram-video.mp4", "video/mp4"
+        elif isinstance(photo, list):
+            default_filename, default_mime = "telegram-photo.jpg", "image/jpeg"
+        else:
+            default_filename, default_mime = "telegram-file", "application/octet-stream"
+        try:
+            downloaded = await download_file(
+                settings,
+                file_id,
+                filename=str(media.get("file_name") or default_filename),
+                mime_type=str(media.get("mime_type") or default_mime),
+                max_bytes=settings.telegram_file_max_bytes,
+            )
+        except (ValueError, httpx.HTTPError):
+            logger.exception("Unable to download Telegram media")
+            max_size_mb = settings.telegram_file_max_bytes / (1024 * 1024)
+            await safe_send_message(settings, telegram_chat_id, f"Не вдалося завантажити файл. Максимальний розмір файла — {max_size_mb:g} МБ.")
+            return {"ok": True}
+        attachment = (downloaded.filename, downloaded.mime_type, downloaded.content)
 
     if callback_data is not None:
         prefix = "select_ticket:"
@@ -438,8 +480,13 @@ async def telegram_webhook(
             return {"ok": True}
         pending = get_pending_action(db, telegram_user_id)
         pending_description = pending is not None and pending.action == "customer_new"
-        if command == "/new" or (pending_description and not command.startswith("/")):
+        if command == "/new" or (pending_description and not command.startswith("/")) or (
+            attachment is not None and get_chat_session(db, telegram_user_id) is None
+        ):
             description = argument if command == "/new" else text.strip()
+            if attachment and not description:
+                await safe_send_message(settings, telegram_chat_id, "Додайте короткий опис файлу в полі підпису та надішліть його ще раз.")
+                return {"ok": True}
             if not description:
                 set_pending_action(
                     db,
@@ -475,6 +522,7 @@ async def telegram_webhook(
                     group_id=group_id,
                     title=title,
                     body=description,
+                    attachments=[attachment] if attachment else None,
                 )
             except ZammadApiError:
                 logger.exception("Unable to create ticket for Zammad user id=%s", link.zammad_user_id)
@@ -523,6 +571,7 @@ async def telegram_webhook(
                 body=text,
                 sender="Customer",
                 article_type="web",
+                attachments=[attachment] if attachment else None,
             )
         except ZammadApiError:
             logger.exception("Unable to add customer article ticket_id=%s", session.zammad_ticket_id)
@@ -631,6 +680,7 @@ async def telegram_webhook(
                 body=text,
                 sender="Agent",
                 article_type="note",
+                attachments=[attachment] if attachment else None,
             )
         except ZammadApiError:
             logger.exception("Unable to add admin article ticket_id=%s", session.zammad_ticket_id)

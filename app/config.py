@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = "replace_me"
     link_token_ttl_seconds: int = 600
     webhook_max_body_bytes: int = 1_048_576
+    telegram_file_max_bytes: int = 20 * 1024 * 1024
     event_retention_days: int = 30
     zammad_base_url: str = "http://localhost:3000"
     zammad_verify_tls: bool = True

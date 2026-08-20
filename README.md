@@ -41,6 +41,7 @@ See [deployment.md](docs/deployment.md) for the complete setup, webhook configur
 - Admin: `/my`, `/newtickets`, `/ticket`, `/current`, `/close`.
 
 Customer messages are added to the active ticket. Admin messages are added as public Agent articles.
+Photos, audio, voice messages, videos, and documents are preserved as Zammad attachments (up to `TELEGRAM_FILE_MAX_BYTES`, 20 MiB by default). Add a caption when sending media to create a new ticket.
 
 ## Languages
 

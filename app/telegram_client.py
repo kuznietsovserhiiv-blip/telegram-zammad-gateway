@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 import httpx
 
@@ -7,6 +8,13 @@ from app.i18n import SUPPORTED_LOCALES, text
 
 
 logger = logging.getLogger("telegram_gateway.telegram")
+
+
+@dataclass(frozen=True)
+class TelegramFile:
+    filename: str
+    mime_type: str
+    content: bytes
 
 
 COMMANDS = {"default": (("start", "start"), ("help", "help")), "customer": (("new", "new"), ("mytickets", "mytickets"), ("current", "current"), ("close", "close"), ("help", "help")), "admin": (("my", "my"), ("newtickets", "newtickets"), ("ticket", "ticket"), ("current", "current"), ("close", "close"), ("help", "help"))}
@@ -29,6 +37,38 @@ def new_ticket_force_reply(locale: str) -> dict:
 
 def ticket_number_force_reply(locale: str) -> dict:
     return {"force_reply": True, "input_field_placeholder": text(locale, "ticket_placeholder")}
+
+
+async def download_file(
+    settings: Settings,
+    file_id: str,
+    *,
+    filename: str,
+    mime_type: str,
+    max_bytes: int,
+) -> TelegramFile:
+    """Resolve and download Telegram media while enforcing a size limit."""
+    base_url = f"https://api.telegram.org/bot{settings.telegram_bot_token}"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        metadata = await client.get(f"{base_url}/getFile", params={"file_id": file_id})
+        metadata.raise_for_status()
+        payload = metadata.json()
+        result = payload.get("result") if isinstance(payload, dict) else None
+        file_path = result.get("file_path") if isinstance(result, dict) else None
+        file_size = result.get("file_size") if isinstance(result, dict) else None
+        if not isinstance(file_path, str) or not file_path:
+            raise ValueError("Telegram did not return a file path")
+        if isinstance(file_size, int) and file_size > max_bytes:
+            raise ValueError("Telegram file is too large")
+        response = await client.get(f"https://api.telegram.org/file/bot{settings.telegram_bot_token}/{file_path}")
+        response.raise_for_status()
+        if len(response.content) > max_bytes:
+            raise ValueError("Telegram file is too large")
+        return TelegramFile(
+            filename=filename[:255] or "telegram-file",
+            mime_type=mime_type[:255] or "application/octet-stream",
+            content=response.content,
+        )
 
 
 async def send_message(

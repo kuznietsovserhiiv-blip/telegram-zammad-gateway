@@ -1,3 +1,4 @@
+import base64
 from dataclasses import dataclass
 from typing import Any
 
@@ -120,6 +121,7 @@ class ZammadApi:
         group_id: int,
         title: str,
         body: str,
+        attachments: list[tuple[str, str, bytes]] | None = None,
     ) -> dict[str, Any]:
         payload = {
             "title": title,
@@ -135,6 +137,11 @@ class ZammadApi:
                 "origin_by_id": user_id,
             },
         }
+        if attachments:
+            payload["article"]["attachments"] = [
+                {"filename": name, "mime-type": mime, "data": base64.b64encode(content).decode("ascii")}
+                for name, mime, content in attachments
+            ]
         data = await self.request("POST", "/api/v1/tickets", json=payload)
         if not isinstance(data, dict) or not data.get("id") or not data.get("number"):
             raise ZammadApiError("Invalid ticket creation response")
@@ -148,6 +155,7 @@ class ZammadApi:
         body: str,
         sender: str,
         article_type: str,
+        attachments: list[tuple[str, str, bytes]] | None = None,
     ) -> dict[str, Any]:
         payload = {
             "ticket_id": ticket_id,
@@ -158,6 +166,11 @@ class ZammadApi:
             "sender": sender,
             "origin_by_id": user_id,
         }
+        if attachments:
+            payload["attachments"] = [
+                {"filename": name, "mime-type": mime, "data": base64.b64encode(content).decode("ascii")}
+                for name, mime, content in attachments
+            ]
         data = await self.request("POST", "/api/v1/ticket_articles", json=payload)
         if not isinstance(data, dict) or not data.get("id"):
             raise ZammadApiError("Invalid article creation response")
