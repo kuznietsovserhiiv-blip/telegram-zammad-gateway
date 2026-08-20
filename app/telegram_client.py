@@ -58,16 +58,31 @@ async def download_file(
         file_size = result.get("file_size") if isinstance(result, dict) else None
         if not isinstance(file_path, str) or not file_path:
             raise ValueError("Telegram did not return a file path")
-        if isinstance(file_size, int) and file_size > max_bytes:
+        try:
+            remote_size = int(file_size)
+        except (TypeError, ValueError):
+            remote_size = 0
+        if remote_size > max_bytes:
             raise ValueError("Telegram file is too large")
-        response = await client.get(f"https://api.telegram.org/file/bot{settings.telegram_bot_token}/{file_path}")
-        response.raise_for_status()
-        if len(response.content) > max_bytes:
-            raise ValueError("Telegram file is too large")
+        content = bytearray()
+        async with client.stream(
+            "GET", f"https://api.telegram.org/file/bot{settings.telegram_bot_token}/{file_path}"
+        ) as response:
+            response.raise_for_status()
+            try:
+                content_length = int(response.headers.get("content-length", "0"))
+            except ValueError:
+                content_length = 0
+            if content_length > max_bytes:
+                raise ValueError("Telegram file is too large")
+            async for chunk in response.aiter_bytes():
+                content.extend(chunk)
+                if len(content) > max_bytes:
+                    raise ValueError("Telegram file is too large")
         return TelegramFile(
             filename=filename[:255] or "telegram-file",
             mime_type=mime_type[:255] or "application/octet-stream",
-            content=response.content,
+            content=bytes(content),
         )
 
 

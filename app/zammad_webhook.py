@@ -18,6 +18,7 @@ from app.config import Settings, get_settings
 from app.database import get_db
 from app.link_service import find_active_zammad_link
 from app.models import TicketStateSnapshot, ZammadWebhookDelivery
+from app.security import read_limited_body
 from app.telegram_client import send_message
 
 
@@ -218,9 +219,7 @@ async def zammad_webhook(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
-    body = await request.body()
-    if len(body) > settings.webhook_max_body_bytes:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Webhook body is too large")
+    body = await read_limited_body(request, settings.webhook_max_body_bytes)
     if not valid_signature(body, x_hub_signature, settings.zammad_webhook_secret):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid webhook signature")
     if not x_zammad_delivery:

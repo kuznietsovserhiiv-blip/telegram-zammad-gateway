@@ -1,4 +1,5 @@
 import logging
+import json
 import secrets
 import time
 
@@ -25,6 +26,7 @@ from app.session_service import (
     set_pending_action,
 )
 from app.models import TelegramUpdate
+from app.security import read_limited_body
 from app.telegram_client import (
     keyboard_for_mode,
     new_ticket_force_reply,
@@ -249,7 +251,6 @@ def help_text(mode: str, locale: str = "uk") -> str:
 
 @router.post("/webhook")
 async def telegram_webhook(
-    update: dict,
     request: Request,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
@@ -261,8 +262,13 @@ async def telegram_webhook(
         x_telegram_bot_api_secret_token, settings.telegram_webhook_secret
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid webhook secret")
-    if len(await request.body()) > settings.webhook_max_body_bytes:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Webhook body is too large")
+    body = await read_limited_body(request, settings.webhook_max_body_bytes)
+    try:
+        update = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
+    if not isinstance(update, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook payload")
     if not reserve_telegram_update(db, update.get("update_id")):
         return {"ok": True}
 

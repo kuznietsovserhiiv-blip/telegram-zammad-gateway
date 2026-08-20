@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-20
+
+### Added
+
+- Telegram media attachments, including photos, audio, voice messages, video, and video notes.
+- Notifications between a linked Customer and the linked owner/Admin of a ticket.
+
+### Fixed
+
+- Enforce webhook request size limits before JSON deserialization.
+- Stream Telegram media downloads with enforced size limits instead of buffering an entire file.
+
 ## [0.3.0] - 2026-08-17
 
 ### Added

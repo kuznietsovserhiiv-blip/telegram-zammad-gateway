@@ -3,7 +3,8 @@ import hashlib
 import hmac
 import json
 
-from fastapi import Request
+import pytest
+from fastapi import HTTPException, Request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -12,6 +13,7 @@ from app.config import Settings
 from app.database import Base
 from app.link_service import find_active_zammad_link
 from app.models import TelegramLink, TicketStateSnapshot
+from app.security import read_limited_body
 from app.zammad_webhook import (
     article_sender,
     customer_id,
@@ -35,11 +37,32 @@ def make_db() -> Session:
     return Session(engine)
 
 
-def make_request(body: bytes) -> Request:
+def make_request(body: bytes, content_length: int | None = None) -> Request:
     async def receive() -> dict[str, object]:
         return {"type": "http.request", "body": body, "more_body": False}
 
-    return Request({"type": "http", "method": "POST", "path": "/zammad/webhook", "headers": []}, receive)
+    headers = []
+    if content_length is not None:
+        headers.append((b"content-length", str(content_length).encode()))
+    return Request({"type": "http", "method": "POST", "path": "/zammad/webhook", "headers": headers}, receive)
+
+
+def test_limited_body_rejects_oversized_content_length() -> None:
+    request = make_request(b"{}", content_length=3)
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(read_limited_body(request, 2))
+
+    assert error.value.status_code == 413
+
+
+def test_limited_body_rejects_oversized_stream() -> None:
+    request = make_request(b"abc")
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(read_limited_body(request, 2))
+
+    assert error.value.status_code == 413
 
 
 def test_zammad_signature_accepts_prefixed_sha1() -> None:
