@@ -1,6 +1,7 @@
 from app.config import Settings
 from app.telegram import (
     command_name,
+    attachment_media,
     format_ticket_list,
     ticket_inline_keyboard,
     ticket_title,
@@ -69,6 +70,11 @@ def test_command_parsing() -> None:
 
 def test_ticket_title_uses_first_nonempty_line() -> None:
     assert ticket_title("\n Printer is offline\nMore details") == "Printer is offline"
+
+
+def test_video_note_is_supported_as_mp4_attachment() -> None:
+    media = attachment_media({"video_note": {"file_id": "note-1"}})
+    assert media == ({"file_id": "note-1"}, "video_note")
 
 
 def test_role_specific_bot_commands() -> None:

@@ -126,6 +126,24 @@ def ticket_title(body: str) -> str:
     return first_line[:120]
 
 
+def attachment_media(message: dict) -> tuple[dict, str] | None:
+    """Return supported Telegram media and its update-field name."""
+    for kind in ("document", "video", "video_note", "audio", "voice"):
+        media = message.get(kind)
+        if isinstance(media, dict):
+            return media, kind
+    photo = message.get("photo")
+    if isinstance(photo, list) and photo:
+        media = max(
+            (item for item in photo if isinstance(item, dict)),
+            key=lambda item: int(item.get("file_size") or 0),
+            default=None,
+        )
+        if media is not None:
+            return media, "photo"
+    return None
+
+
 def zammad_search_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
@@ -264,14 +282,8 @@ async def telegram_webhook(
     if not isinstance(message, dict):
         return {"ok": True}
     chat = message.get("chat") or {}
-    media = message.get("document") or message.get("video") or message.get("audio") or message.get("voice")
-    photo = message.get("photo")
-    if isinstance(photo, list) and photo:
-        media = max(
-            (item for item in photo if isinstance(item, dict)),
-            key=lambda item: int(item.get("file_size") or 0),
-            default=None,
-        )
+    media_item = attachment_media(message)
+    media = media_item[0] if media_item else None
     if (
         chat.get("type") != "private"
         or not isinstance(sender, dict)
@@ -363,13 +375,16 @@ async def telegram_webhook(
         if not isinstance(file_id, str) or not file_id:
             await safe_send_message(settings, telegram_chat_id, "Не вдалося визначити файл Telegram.")
             return {"ok": True}
-        if "voice" in message:
+        media_kind = media_item[1]
+        if media_kind == "voice":
             default_filename, default_mime = "telegram-voice.ogg", "audio/ogg"
-        elif "audio" in message:
+        elif media_kind == "audio":
             default_filename, default_mime = "telegram-audio.mp3", "audio/mpeg"
-        elif "video" in message:
+        elif media_kind == "video_note":
+            default_filename, default_mime = "telegram-video-note.mp4", "video/mp4"
+        elif media_kind == "video":
             default_filename, default_mime = "telegram-video.mp4", "video/mp4"
-        elif isinstance(photo, list):
+        elif media_kind == "photo":
             default_filename, default_mime = "telegram-photo.jpg", "image/jpeg"
         else:
             default_filename, default_mime = "telegram-file", "application/octet-stream"
