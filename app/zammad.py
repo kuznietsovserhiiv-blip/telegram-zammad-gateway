@@ -137,6 +137,7 @@ class ZammadApi:
                 "origin_by_id": user_id,
             },
         }
+        payload["article"]["sender_id"] = 2
         if attachments:
             payload["article"]["attachments"] = [
                 {"filename": name, "mime-type": mime, "data": base64.b64encode(content).decode("ascii")}
@@ -166,6 +167,10 @@ class ZammadApi:
             "sender": sender,
             "origin_by_id": user_id,
         }
+        sender_ids = {"Agent": 1, "Customer": 2, "System": 3}
+        sender_id = sender_ids.get(sender)
+        if sender_id is not None:
+            payload["sender_id"] = sender_id
         if attachments:
             payload["attachments"] = [
                 {"filename": name, "mime-type": mime, "data": base64.b64encode(content).decode("ascii")}

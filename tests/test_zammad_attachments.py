@@ -33,6 +33,7 @@ def test_article_attachment_is_base64_encoded() -> None:
         "type": "web",
         "internal": False,
         "sender": "Customer",
+        "sender_id": 2,
         "origin_by_id": 34,
         "attachments": [
             {"filename": "telegram-voice.ogg", "mime-type": "audio/ogg", "data": "YXVkaW8="}
