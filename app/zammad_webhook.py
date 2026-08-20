@@ -96,6 +96,10 @@ def customer_id(ticket: dict[str, Any]) -> int | None:
     return nested_id(ticket.get("customer_id")) or nested_id(ticket.get("customer"))
 
 
+def owner_id(ticket: dict[str, Any]) -> int | None:
+    return nested_id(ticket.get("owner_id")) or nested_id(ticket.get("owner"))
+
+
 def ticket_state(ticket: dict[str, Any]) -> tuple[str, str] | None:
     value = ticket.get("state")
     state_id = nested_id(ticket.get("state_id"))
@@ -237,6 +241,8 @@ async def zammad_webhook(
     outcome = "ignored_no_ticket"
     messages: list[str] = []
     sent_kinds: list[str] = []
+    owner_message: str | None = None
+    owner_link = None
     state_to_store: tuple[int, str, str, str] | None = None
 
     if isinstance(ticket, dict):
@@ -244,6 +250,8 @@ async def zammad_webhook(
         number = str(ticket.get("number") or ticket_id or "?")
         zammad_customer_id = customer_id(ticket)
         link = find_active_zammad_link(db, zammad_customer_id) if zammad_customer_id else None
+        zammad_owner_id = owner_id(ticket)
+        owner_link = find_active_zammad_link(db, zammad_owner_id) if zammad_owner_id else None
         outcome = "ignored_no_article"
 
         current_state = ticket_state(ticket)
@@ -279,12 +287,23 @@ async def zammad_webhook(
         if article.get("internal") is not False:
             if not sent_kinds:
                 outcome = "ignored_internal"
-        elif article_sender(article) != "agent":
-            if not sent_kinds:
-                outcome = "ignored_non_agent"
         elif settings.zammad_service_user_id and created_by_id == settings.zammad_service_user_id:
             if not sent_kinds:
                 outcome = "ignored_gateway_echo"
+        elif article_sender(article) == "customer":
+            if owner_link is None:
+                if not sent_kinds:
+                    outcome = "ignored_unlinked_owner"
+            else:
+                body_text = html_to_text(str(article.get("body") or ""))
+                if not body_text:
+                    body_text = "Нове повідомлення без тексту."
+                owner_message = (
+                    f"Заявка #{number}: новий коментар від {sender_name(article)}\n\n{body_text}"
+                )
+        elif article_sender(article) != "agent":
+            if not sent_kinds:
+                outcome = "ignored_non_agent"
         else:
             if link is None:
                 if not sent_kinds:
@@ -311,6 +330,19 @@ async def zammad_webhook(
                 detail="Telegram delivery failed",
             ) from exc
         outcome = "sent_customer_" + "_".join(sent_kinds)
+
+    if owner_message and owner_link is not None:
+        try:
+            await send_message(settings, owner_link.telegram_chat_id, owner_message[:4096])
+        except httpx.HTTPError as exc:
+            logger.exception("Telegram owner delivery failed for Zammad delivery=%s", x_zammad_delivery)
+            db.delete(delivery)
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Telegram owner delivery failed",
+            ) from exc
+        outcome = "sent_owner_article"
 
     if state_to_store is not None:
         stored_ticket_id, stored_number, state_key, state_name = state_to_store

@@ -17,6 +17,7 @@ from app.zammad_webhook import (
     customer_id,
     html_to_text,
     localized_state_name,
+    owner_id,
     reserve_delivery,
     ticket_state,
     valid_signature,
@@ -57,6 +58,8 @@ def test_payload_helpers_support_objects_and_ids() -> None:
     assert article_sender({"sender": {"name": "Agent"}}) == "agent"
     assert customer_id({"customer": {"id": 42}}) == 42
     assert customer_id({"customer_id": 43}) == 43
+    assert owner_id({"owner": {"id": 44}}) == 44
+    assert owner_id({"owner_id": 45}) == 45
     assert ticket_state({"state_id": 4, "state": {"id": 4, "name": "closed"}}) == (
         "id:4",
         "closed",
@@ -160,6 +163,56 @@ def test_public_agent_article_is_sent_once(monkeypatch) -> None:
     assert sent == [(888, "Заявка #811026: новий коментар від Serhii Kuznetsov\n\nPublic reply")]
     snapshot = db.query(TicketStateSnapshot).one()
     assert snapshot.state_key == "id:2"
+
+
+def test_public_customer_article_is_sent_to_linked_ticket_owner(monkeypatch) -> None:
+    db = make_db()
+    db.add(
+        TelegramLink(
+            telegram_user_id=999,
+            telegram_chat_id=1000,
+            telegram_username="admin",
+            zammad_user_id=7,
+            zammad_login="admin@example.com",
+            created_at=1,
+            updated_at=1,
+            active=True,
+        )
+    )
+    db.commit()
+    sent: list[tuple[int, str]] = []
+
+    async def fake_send_message(settings: Settings, chat_id: int, text: str) -> None:
+        sent.append((chat_id, text))
+
+    secret = "test-secret"
+    settings = Settings(zammad_webhook_secret=secret, zammad_service_user_id=260)
+    monkeypatch.setattr("app.zammad_webhook.send_message", fake_send_message)
+    payload = {
+        "ticket": {"id": 100, "number": "811026", "customer_id": 42, "owner_id": 7},
+        "article": {
+            "id": 4760,
+            "body": "Need <b>help</b>",
+            "internal": False,
+            "sender": "Customer",
+            "created_by_id": 42,
+            "created_by": {"id": 42, "firstname": "Iryna", "lastname": "Customer"},
+        },
+    }
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    signature = hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()
+    response = asyncio.run(
+        zammad_webhook(
+            make_request(body),
+            x_hub_signature=f"sha1={signature}",
+            x_zammad_delivery="delivery-owner-article-1",
+            db=db,
+            settings=settings,
+        )
+    )
+
+    assert response["outcome"] == "sent_owner_article"
+    assert sent == [(1000, "Заявка #811026: новий коментар від Iryna Customer\n\nNeed help")]
 
 
 def test_state_change_is_sent_after_baseline(monkeypatch) -> None:
