@@ -217,6 +217,56 @@ def test_public_customer_article_is_sent_to_linked_ticket_owner(monkeypatch) -> 
     assert sent == [(1000, "Заявка #811026: новий коментар від Iryna Customer\n\nNeed help")]
 
 
+def test_owner_article_is_sent_to_customer_when_zammad_labels_it_customer(monkeypatch) -> None:
+    db = make_db()
+    db.add(
+        TelegramLink(
+            telegram_user_id=777,
+            telegram_chat_id=888,
+            telegram_username="customer",
+            zammad_user_id=42,
+            zammad_login="customer@example.com",
+            created_at=1,
+            updated_at=1,
+            active=True,
+        )
+    )
+    db.commit()
+    sent: list[tuple[int, str]] = []
+
+    async def fake_send_message(settings: Settings, chat_id: int, text: str) -> None:
+        sent.append((chat_id, text))
+
+    secret = "test-secret"
+    settings = Settings(zammad_webhook_secret=secret, zammad_service_user_id=260)
+    monkeypatch.setattr("app.zammad_webhook.send_message", fake_send_message)
+    payload = {
+        "ticket": {"id": 100, "number": "811026", "customer_id": 42, "owner_id": 7},
+        "article": {
+            "id": 4761,
+            "body": "Reply from Telegram",
+            "internal": False,
+            "sender": "Customer",
+            "origin_by": "admin@example.com",
+            "origin_by_id": 7,
+        },
+    }
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    signature = hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()
+    response = asyncio.run(
+        zammad_webhook(
+            make_request(body),
+            x_hub_signature=f"sha1={signature}",
+            x_zammad_delivery="delivery-owner-origin-1",
+            db=db,
+            settings=settings,
+        )
+    )
+
+    assert response["outcome"] == "sent_customer_article"
+    assert sent == [(888, "Заявка #811026: новий коментар від admin@example.com\n\nReply from Telegram")]
+
+
 def test_state_change_is_sent_after_baseline(monkeypatch) -> None:
     db = make_db()
     db.add_all(

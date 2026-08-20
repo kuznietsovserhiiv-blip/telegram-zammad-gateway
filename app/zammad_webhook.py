@@ -243,6 +243,7 @@ async def zammad_webhook(
     sent_kinds: list[str] = []
     owner_message: str | None = None
     owner_link = None
+    zammad_owner_id: int | None = None
     state_to_store: tuple[int, str, str, str] | None = None
 
     if isinstance(ticket, dict):
@@ -283,9 +284,26 @@ async def zammad_webhook(
                     sent_kinds.append("state")
 
     if isinstance(article, dict) and isinstance(ticket, dict):
+        article_origin_by_id = nested_id(article.get("origin_by_id"))
+        is_owner_article = (
+            zammad_owner_id is not None and article_origin_by_id == zammad_owner_id
+        )
         if article.get("internal") is not False:
             if not sent_kinds:
                 outcome = "ignored_internal"
+        elif is_owner_article or article_sender(article) == "agent":
+            if link is None:
+                if not sent_kinds:
+                    outcome = "ignored_unlinked_customer"
+            else:
+                body_text = html_to_text(str(article.get("body") or ""))
+                if not body_text:
+                    body_text = "Нове повідомлення без тексту."
+                agent_name = str(article.get("origin_by") or "").strip() or sender_name(article)
+                messages.append(
+                    f"Заявка #{number}: новий коментар від {agent_name}\n\n{body_text}"
+                )
+                sent_kinds.append("article")
         elif article_sender(article) == "customer":
             if owner_link is None:
                 if not sent_kinds:
@@ -301,19 +319,6 @@ async def zammad_webhook(
         elif article_sender(article) != "agent":
             if not sent_kinds:
                 outcome = "ignored_non_agent"
-        else:
-            if link is None:
-                if not sent_kinds:
-                    outcome = "ignored_unlinked_customer"
-            else:
-                body_text = html_to_text(str(article.get("body") or ""))
-                if not body_text:
-                    body_text = "Нове повідомлення без тексту."
-                agent_name = str(article.get("origin_by") or "").strip() or sender_name(article)
-                messages.append(
-                    f"Заявка #{number}: новий коментар від {agent_name}\n\n{body_text}"
-                )
-                sent_kinds.append("article")
 
     if messages and isinstance(ticket, dict) and link is not None:
         message = "\n\n——\n\n".join(messages)[:4096]
